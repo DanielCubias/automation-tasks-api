@@ -12,8 +12,8 @@ Sistema backend construido con FastAPI para automatizar tareas repetitivas utili
 - Python  
 - FastAPI  
 - HTTPX  
-- *(Próximamente)* Celery + Redis  
-- *(Próximamente)* PostgreSQL  
+- Celery + Redis  
+- PostgreSQL  
 
 ## ▶️ Cómo ejecutarlo
 ```bash
