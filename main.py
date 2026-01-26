@@ -141,7 +141,7 @@ async def run_check(timeout_seconds: float = 5.0) -> List[Dict[str, Any]]:
 
 @app.post("/runs")
 async def crear_run():
-    resultado = await run_check(tiempo_segundos= 5.0)
+    resultado = await run_check(timeout_seconds=5.0)
 
     run = {
         "id": str(uuid4()),
@@ -152,3 +152,19 @@ async def crear_run():
 
     runs.append(run)
     return run
+
+
+@app.get("/runs")
+def lista_runs():
+    return [
+        {"id": r["id"], "created_at": r["created_at"], "count": r["count"]}
+        for r in runs
+    ]
+
+
+@app.get("/runs/{run_id}")
+def get_run(run_id: str):
+    for r in runs:
+        if r["id"] == run_id:
+            return r
+    raise HTTPException(status_code=404, detail="Run no encontrado")
