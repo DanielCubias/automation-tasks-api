@@ -4,10 +4,13 @@ from io import StringIO
 import time
 import httpx
 from typing import List, Dict, Any
+from datetime import datetime
+from uuid import uuid4
 
 app = FastAPI(title="Automation Tasks API")
 
 guardar_urls = []
+runs = []  # historial de ejecuciones
 
 @app.get("/health")
 def health():
@@ -134,3 +137,18 @@ async def run_check(timeout_seconds: float = 5.0) -> List[Dict[str, Any]]:
 
     # Devuelvo la lista final con los resultados de todas las URLs
     return results
+
+
+@app.post("/runs")
+async def crear_run():
+    resultado = await run_check(tiempo_segundos= 5.0)
+
+    run = {
+        "id": str(uuid4()),
+        "created_at": datetime.utcnow().isoformat() + "Z", 
+        "count": len(resultado) ,
+        "resultado": resultado
+    }
+
+    runs.append(run)
+    return run
