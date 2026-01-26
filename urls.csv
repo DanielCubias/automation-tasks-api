@@ -2,3 +2,4 @@ name,url
 google,https://google.com
 GitHub,https://github.com
 FastAPI,https://fastapi.tiangolo.com
+BadURL,https://no-existe-123456789.com
