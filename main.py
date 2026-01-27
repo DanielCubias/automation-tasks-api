@@ -6,9 +6,18 @@ import httpx
 from typing import List, Dict, Any
 from datetime import datetime
 from uuid import uuid4
-
+from fastapi import Depends
+from sqlalchemy.orm import Session
+from db import SessionLocal
 
 app = FastAPI(title="Automation Tasks API")
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 guardar_urls = []
 runs = []  # historial de ejecuciones
