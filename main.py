@@ -7,6 +7,7 @@ from typing import List, Dict, Any
 from datetime import datetime
 from uuid import uuid4
 
+
 app = FastAPI(title="Automation Tasks API")
 
 guardar_urls = []
