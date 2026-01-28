@@ -29,7 +29,7 @@ def health():
 
 # Endpoint para cargar un archivo CSV con URLs
 @app.post("/cargar_urls")
-async def cargar_urls(file: UploadFile = File(...)):
+async def cargar_urls(file: UploadFile = File(...), db: Session = Depends(get_db)):
     # Primero valido que el archivo realmente sea un CSV
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="El archivo tiene que ser csv")
@@ -53,20 +53,36 @@ async def cargar_urls(file: UploadFile = File(...)):
             detail="CSV debe de tener las columnas: name,url"
         )
 
+
     # Limpio la lista global antes de cargar nuevos datos
     guardar_urls.clear()
 
-    # Recorro cada fila del CSV y guardo solo los campos que necesito
-    for row in reader:
-        guardar_urls.append({
-            "name": row["name"],
-            "url": row["url"]
-        })
+   
+   # 1) Creo una lista (representa “este CSV subido”)
+    url_list = URLList(
+        id=str(uuid4()),
+        name=file.filename,
+        created_at=datetime.utcnow(),
+    )
+    db.add(url_list)
 
-    # Devuelvo un mensaje de éxito y la cantidad de URLs cargadas
+    # 2) Inserto todas las URLs asociadas
+    count = 0
+    for row in reader:
+        db.add(URL(
+            id=str(uuid4()),
+            url_list_id=url_list.id,
+            name=row["name"].strip(),
+            url=row["url"].strip()
+        ))
+        count += 1
+    
+    db.commit()
+
     return {
-        "message": "URLs uploaded successfully",
-        "count": len(guardar_urls )
+        "message": "CSV guardado en base de datos",
+        "list_id": url_list.id,
+        "count": count
     }
 
 
