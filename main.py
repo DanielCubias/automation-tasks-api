@@ -21,10 +21,6 @@ def get_db():
         db.close()
 
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
-
 
 # Endpoint para cargar un archivo CSV con URLs
 @app.post("/cargar_urls")
