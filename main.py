@@ -1,14 +1,15 @@
-from fastapi import FastAPI , UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
+from sqlalchemy.orm import Session
+from models import URLList, URL, Run, RunResult
+from db import SessionLocal
 import csv
 from io import StringIO
 import time
 import httpx
-from typing import List, Dict, Any
 from datetime import datetime
 from uuid import uuid4
-from fastapi import Depends
-from sqlalchemy.orm import Session
-from db import SessionLocal
+
+
 
 app = FastAPI(title="Automation Tasks API")
 
@@ -19,8 +20,6 @@ def get_db():
     finally:
         db.close()
 
-guardar_urls = []
-runs = []  # historial de ejecuciones
 
 @app.get("/health")
 def health():
@@ -51,13 +50,7 @@ async def cargar_urls(file: UploadFile = File(...), db: Session = Depends(get_db
         raise HTTPException(
             status_code=400,
             detail="CSV debe de tener las columnas: name,url"
-        )
-
-
-    # Limpio la lista global antes de cargar nuevos datos
-    guardar_urls.clear()
-
-   
+        )   
    # 1) Creo una lista (representa “este CSV subido”)
     url_list = URLList(
         id=str(uuid4()),
@@ -87,110 +80,117 @@ async def cargar_urls(file: UploadFile = File(...), db: Session = Depends(get_db
 
 
 # Endpoint para listar todas las URLs almacenadas
-@app.get("/urls")
-def list_urls():
-    return guardar_urls 
 
-
-# Endpoint para ejecutar el chequeo HTTP de las URLs
-@app.post("/run-check")
-async def run_check(timeout_seconds: float = 5.0) -> List[Dict[str, Any]]:
-    """
-    Aquí ejecuto un chequeo HTTP sobre todas las URLs que he cargado previamente con el CSV.
-    La idea es devolver para cada URL:
-    - si responde bien (ok)
-    - el status_code
-    - el tiempo que tarda en responder (time_ms)
-    - y si falla, el error correspondiente
-    """
-
-    # Si el usuario no ha subido todavía un CSV, no tiene sentido ejecutar nada,
-    # así que corto aquí y devuelvo un error .
-    if not guardar_urls:
-        raise HTTPException(
-            status_code=400,
-            detail="No hay URLs cargadas. Primero sube un CSV."
-        )
-
-    # Aquí iré guardando el resultado de cada URL en forma de lista de diccionarios
-    results: List[Dict[str, Any]] = []
-
-    # Creo un cliente HTTP asíncrono para hacer las peticiones sin bloquear el servidor
-    # follow_redirects=True -> por si una URL redirige (por ejemplo http -> https)
-    # timeout=timeout_seconds -> para no quedarme esperando si la URL está mal
-    async with httpx.AsyncClient(
-        follow_redirects=True,
-        timeout=timeout_seconds
-    ) as client:
-
-        # Recorro todas las URLs que tengo cargadas en memoria
-        for item in guardar_urls:
-            # Saco el nombre y la url, y les hago strip para limpiar espacios
-            name = item.get("name", "").strip()
-            url = item.get("url", "").strip()
-
-            # Empiezo a medir el tiempo antes de lanzar la petición
-            start = time.perf_counter()
-            try:
-                # Hago la petición GET a la URL
-                resp = await client.get(url)
-
-                # Calculo el tiempo total en milisegundos
-                elapsed_ms = int((time.perf_counter() - start) * 1000)
-
-                # Guardo el resultado si la petición fue correcta
-                # Considero ok cualquier status entre 200 y 399
-                results.append({
-                    "name": name,
-                    "url": url,
-                    "ok": 200 <= resp.status_code < 400,
-                    "status_code": resp.status_code,
-                    "time_ms": elapsed_ms,
-                })
-
-            except httpx.RequestError as e:
-                # Si hay un fallo de red (DNS, timeout, conexión, etc.)
-                # también mido el tiempo y guardo el error para saber qué pasó
-                elapsed_ms = int((time.perf_counter() - start) * 1000)
-                results.append({
-                    "name": name,
-                    "url": url,
-                    "ok": False,
-                    "status_code": None,
-                    "time_ms": elapsed_ms,
-                    "error": str(e),
-                })
-
-    # Devuelvo la lista final con los resultados de todas las URLs
-    return results
+@app.get("/url-lists")
+def listar_url_lists(db: Session = Depends(get_db)):
+    lists = db.query(URLList).order_by(URLList.created_at.desc()).all()
+    return [{"id": l.id, "name": l.name, "created_at": l.created_at.isoformat() + "Z"} for l in lists]
 
 
 @app.post("/runs")
-async def crear_run():
-    resultado = await run_check(timeout_seconds=5.0)
+async def crear_run(list_id: str,timeout_seconds: float = 5.0,db: Session = Depends(get_db)
+):
+    """Ejecuta un chequeo HTTP sobre una lista de URLs y guarda el resultado en BD"""
+    
+    # Verifico que la lista exista
+    url_list = db.query(URLList).filter(URLList.id == list_id).first()
+    if not url_list:
+        raise HTTPException(status_code=404, detail="Lista no encontrada")
+    
+    # Obtengo todas las URLs de esa lista
+    urls = db.query(URL).filter(URL.url_list_id == list_id).all()
+    if not urls:
+        raise HTTPException(status_code=400, detail="No hay URLs en esta lista")
 
-    run = {
-        "id": str(uuid4()),
-        "created_at": datetime.utcnow().isoformat() + "Z", 
-        "count": len(resultado) ,
-        "resultado": resultado
+    # Creo el registro del Run
+    run = Run(
+        id=str(uuid4()),
+        url_list_id=list_id,
+        created_at=datetime.utcnow(),
+        count=len(urls)
+    )
+    db.add(run)
+    
+    # Ejecuto el chequeo HTTP
+    async with httpx.AsyncClient(follow_redirects=True, timeout=timeout_seconds) as client:
+        for url_obj in urls:
+            start = time.perf_counter()
+            try:
+                resp = await client.get(url_obj.url)
+                elapsed_ms = int((time.perf_counter() - start) * 1000)
+                result = RunResult(
+                    id=str(uuid4()),
+                    run_id=run.id,
+                    name=url_obj.name,
+                    url=url_obj.url,
+                    ok=200 <= resp.status_code < 400,
+                    status_code=resp.status_code,
+                    time_ms=elapsed_ms,
+                )
+                db.add(result)
+                
+            except httpx.RequestError as e:
+                elapsed_ms = int((time.perf_counter() - start) * 1000)
+                result = RunResult(
+                    id=str(uuid4()),
+                    run_id=run.id,
+                    name=url_obj.name,
+                    url=url_obj.url,
+                    ok=False,
+                    status_code=None,
+                    time_ms=elapsed_ms,
+                    error=str(e)
+                )
+                db.add(result)
+    
+    db.commit()
+    
+    return {
+        "id": run.id,
+        "created_at": run.created_at.isoformat() + "Z",
+        "count": run.count,
+        "list_id": list_id
     }
-
-    runs.append(run)
-    return run
 
 
 @app.get("/runs")
-def lista_runs():
+def lista_runs(db: Session = Depends(get_db)):
+    """Lista todos los runs ejecutados"""
+    runs = db.query(Run).order_by(Run.created_at.desc()).all()
     return [
-        {"id": r["id"], "created_at": r["created_at"], "count": r["count"]}
+        {
+            "id": r.id,
+            "created_at": r.created_at.isoformat() + "Z",
+            "count": r.count,
+            "list_id": r.url_list_id
+        }
         for r in runs
     ]
 
 
 @app.get("/runs/{run_id}")
-def get_run(run_id: str):
-    for r in runs:
-        if r["id"] == run_id:
-            return r
-    raise HTTPException(status_code=404, detail="Run no encontrado")
+def get_run(run_id: str, db: Session = Depends(get_db)):
+    """Obtiene el detalle completo de un run específico"""
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run no encontrado")
+
+    results = db.query(RunResult).filter(RunResult.run_id == run_id).all()
+
+    return {
+        "id": run.id,
+        "created_at": run.created_at.isoformat() + "Z",
+        "count": run.count,
+        "list_id": run.url_list_id,
+        "resultado": [
+            {
+                "name": r.name,
+                "url": r.url,
+                "ok": r.ok,
+                "status_code": r.status_code,
+                "time_ms": r.time_ms,
+                "error": r.error
+            }
+            for r in results
+        ]
+    }
