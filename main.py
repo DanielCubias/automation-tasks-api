@@ -9,6 +9,7 @@ import httpx
 from datetime import datetime
 from uuid import uuid4
 from APScheduler import start_scheduler, shutdown_scheduler
+from services import ejecutar_run_para_lista
 
 
 app = FastAPI(title="Automation Tasks API")
@@ -84,68 +85,13 @@ def listar_url_lists(db: Session = Depends(get_db)):
 
 
 @app.post("/runs")
-async def crear_run(list_id: str,timeout_seconds: float = 5.0,db: Session = Depends(get_db)
-):
-    """Ejecuta un chequeo HTTP sobre una lista de URLs y guarda el resultado en BD"""
-    
-    # Verifico que la lista exista
-    url_list = db.query(URLList).filter(URLList.id == list_id).first()
-    if not url_list:
-        raise HTTPException(status_code=404, detail="Lista no encontrada")
-    
-    # Obtengo todas las URLs de esa lista
-    urls = db.query(URL).filter(URL.url_list_id == list_id).all()
-    if not urls:
-        raise HTTPException(status_code=400, detail="No hay URLs en esta lista")
-
-    # Creo el registro del Run
-    run = Run(
-        id=str(uuid4()),
-        url_list_id=list_id,
-        created_at=datetime.utcnow(),
-        count=len(urls)
-    )
-    db.add(run)
-    
-    # Ejecuto el chequeo HTTP
-    async with httpx.AsyncClient(follow_redirects=True, timeout=timeout_seconds) as client:
-        for url_obj in urls:
-            start = time.perf_counter()
-            try:
-                resp = await client.get(url_obj.url)
-                elapsed_ms = int((time.perf_counter() - start) * 1000)
-                result = RunResult(
-                    id=str(uuid4()),
-                    run_id=run.id,
-                    name=url_obj.name,
-                    url=url_obj.url,
-                    ok=200 <= resp.status_code < 400,
-                    status_code=resp.status_code,
-                    time_ms=elapsed_ms,
-                )
-                db.add(result)
-                
-            except httpx.RequestError as e:
-                elapsed_ms = int((time.perf_counter() - start) * 1000)
-                result = RunResult(
-                    id=str(uuid4()),
-                    run_id=run.id,
-                    name=url_obj.name,
-                    url=url_obj.url,
-                    ok=False,
-                    status_code=None,
-                    time_ms=elapsed_ms,
-                    error=str(e)
-                )
-                db.add(result)
-    
-    db.commit()
-    
+async def crear_run(list_id: str, timeout_seconds: float = 5.0, db: Session = Depends(get_db)):
+    run = await ejecutar_run_para_lista(db=db, list_id=list_id, timeout_seconds=timeout_seconds)
     return {
         "id": run.id,
         "created_at": run.created_at.isoformat() + "Z",
         "count": run.count,
-        "list_id": list_id
+        "list_id": run.url_list_id
     }
 
 
