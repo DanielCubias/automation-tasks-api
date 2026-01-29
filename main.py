@@ -8,10 +8,11 @@ import time
 import httpx
 from datetime import datetime
 from uuid import uuid4
-
+from APScheduler import start_scheduler, shutdown_scheduler
 
 
 app = FastAPI(title="Automation Tasks API")
+
 
 def get_db():
     db = SessionLocal()
@@ -19,6 +20,12 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+
+
+
+
 
 
 
