@@ -22,13 +22,6 @@ def get_db():
         db.close()
 
 
-
-
-
-
-
-
-
 # Endpoint para cargar un archivo CSV con URLs
 @app.post("/cargar_urls")
 async def cargar_urls(file: UploadFile = File(...), db: Session = Depends(get_db)):
@@ -197,3 +190,13 @@ def get_run(run_id: str, db: Session = Depends(get_db)):
             for r in results
         ]
     }
+
+
+@app.on_event("startup")
+def startup_event():
+    start_scheduler()
+
+
+@app.on_event("shutdown")
+def shutdown_event():
+    shutdown_scheduler()
