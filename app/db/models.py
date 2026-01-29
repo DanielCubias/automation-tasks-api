@@ -1,8 +1,7 @@
 from sqlalchemy import Column, String, Integer, Boolean, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from datetime import datetime
-from db import Base
-
+from db.db import Base
 
 class URLList(Base):
     __tablename__ = "url_lists"

@@ -1,15 +1,15 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from sqlalchemy.orm import Session
-from models import URLList, URL, Run, RunResult
-from db import SessionLocal
+from db.models import URLList, URL, Run, RunResult
+from db.db import SessionLocal
 import csv
 from io import StringIO
 import time
 import httpx
 from datetime import datetime
 from uuid import uuid4
-from APScheduler import start_scheduler, shutdown_scheduler
-from services import ejecutar_run_para_lista
+from core.APScheduler import start_scheduler, shutdown_scheduler
+from services.services import ejecutar_run_para_lista
 
 
 app = FastAPI(title="Automation Tasks API")

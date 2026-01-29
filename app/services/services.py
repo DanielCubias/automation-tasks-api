@@ -5,7 +5,7 @@ from uuid import uuid4
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
-from models import URLList, URL, Run, RunResult
+from db.models import URLList, URL, Run, RunResult
 
 
 async def ejecutar_run_para_lista(db: Session, list_id: str, timeout_seconds: float = 5.0) -> Run:
