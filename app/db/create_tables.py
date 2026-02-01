@@ -1,6 +1,9 @@
 from app.db.db import engine
-from app.db.models import Base
+from app.db.base import Base
+import app.db.models  # importante: registra modelos
 
-if __name__ == "__main__":
-    Base.metadata.create_all(bind=engine)
-    print("Tablas creadas correctamente")
+print("USANDO:", engine.url)
+print("REGISTRADAS:", list(Base.metadata.tables.keys()))
+
+Base.metadata.create_all(bind=engine)
+print("Tablas creadas correctamente")
