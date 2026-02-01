@@ -6,7 +6,7 @@ from uuid import uuid4
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from db.models import URLList, URL, Run, RunResult
+from app.db.models import URLList, URL, Run, RunResult
 
 
 def limitando_runs(db: Session, url_list_id: str, max_runs: int = 200):

@@ -2,9 +2,10 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from sqlalchemy.orm import Session
 
-from db.db import SessionLocal
-from db.models import URLList
-from services.services import ejecutar_run_para_lista
+from app.db.db import SessionLocal
+from app.db.models import URLList
+
+from app.services.services import ejecutar_run_para_lista
 
 scheduler = AsyncIOScheduler()
 
