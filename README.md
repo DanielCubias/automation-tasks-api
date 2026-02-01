@@ -33,11 +33,14 @@ Este proyecto está orientado a demostrar automatización backend real, diseño 
 
 ## 🧱 Arquitectura actual
 
-CSV -> FastAPI -> PostgreSQL
-↓
-HTTP checks
-↓
-Runs + Results
+CSV
+  ↓
+FastAPI (API REST)
+  ↓
+HTTP checks (httpx)
+  ↓
+PostgreSQL (Runs + Results)
+
 
 
 ### Modelos principales
@@ -76,13 +79,13 @@ docker compose up -d
 
 ### 2. Crear las tablas
 ```bash
-python create_tables.py
+py -m app.db.create_tables
 ```
 
 ### 3. Arrancar la API
 ```bash
 
-uvicorn main:app --reload
+uvicorn app.main:app --reload
 ```
 Acceder a la documentación interactiva:
 
@@ -126,3 +129,35 @@ Diseñar APIs REST limpias y mantenibles.
 Trabajar con persistencia y trazabilidad de ejecuciones.
 
 Simular sistemas de automatización utilizados en entornos profesionales.
+
+
+### 📚 Lo que he aprendido con este proyecto
+
+**Durante el desarrollo de este proyecto he aprendido a:**
+
+Diseñar una API REST real con FastAPI orientada a automatización.
+
+Estructurar un proyecto Python como paquete profesional (app.*) evitando errores de imports.
+
+Trabajar con SQLAlchemy ORM para modelar entidades y relaciones.
+
+Gestionar sesiones de base de datos y conexiones con PostgreSQL.
+
+Entender y resolver errores reales de arquitectura (múltiples Base, imports incorrectos, contextos de ejecución).
+
+Ejecutar procesos automáticos que:
+
+leen datos
+
+hacen peticiones HTTP
+
+guardan resultados
+
+permiten trazabilidad.
+
+Usar Docker para aislar la base de datos.
+
+Depurar errores reales de producción (paths, dependencias, runtime).
+
+Documentar una API con Swagger (OpenAPI).
+
